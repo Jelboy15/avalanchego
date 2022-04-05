@@ -117,19 +117,19 @@ func (mr *MockManagerMockRecorder) GetFactory(vmID interface{}) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetFactory", reflect.TypeOf((*MockManager)(nil).GetFactory), vmID)
 }
 
-// ListVMs mocks base method.
-func (m *MockManager) ListVMs() ([]ids.ID, error) {
+// ListFactories mocks base method.
+func (m *MockManager) ListFactories() ([]ids.ID, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "ListVMs")
+	ret := m.ctrl.Call(m, "ListFactories")
 	ret0, _ := ret[0].([]ids.ID)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
-// ListVMs indicates an expected call of ListVMs.
-func (mr *MockManagerMockRecorder) ListVMs() *gomock.Call {
+// ListFactories indicates an expected call of ListFactories.
+func (mr *MockManagerMockRecorder) ListFactories() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListVMs", reflect.TypeOf((*MockManager)(nil).ListVMs))
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListFactories", reflect.TypeOf((*MockManager)(nil).ListFactories))
 }
 
 // Lookup mocks base method.
@@ -160,6 +160,20 @@ func (m *MockManager) PrimaryAlias(id ids.ID) (string, error) {
 func (mr *MockManagerMockRecorder) PrimaryAlias(id interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PrimaryAlias", reflect.TypeOf((*MockManager)(nil).PrimaryAlias), id)
+}
+
+// PrimaryAliasOrDefault mocks base method.
+func (m *MockManager) PrimaryAliasOrDefault(id ids.ID) string {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "PrimaryAliasOrDefault", id)
+	ret0, _ := ret[0].(string)
+	return ret0
+}
+
+// PrimaryAliasOrDefault indicates an expected call of PrimaryAliasOrDefault.
+func (mr *MockManagerMockRecorder) PrimaryAliasOrDefault(id interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PrimaryAliasOrDefault", reflect.TypeOf((*MockManager)(nil).PrimaryAliasOrDefault), id)
 }
 
 // RegisterFactory mocks base method.

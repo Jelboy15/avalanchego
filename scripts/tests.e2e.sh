@@ -4,6 +4,7 @@ set -e
 # e.g.,
 # ./scripts/build.sh
 # ./scripts/tests.e2e.sh ./build/avalanchego
+# ENABLE_WHITELIST_VTX_TESTS=true ./scripts/tests.e2e.sh ./build/avalanchego
 if ! [[ "$0" =~ scripts/tests.e2e.sh ]]; then
   echo "must be run from repository root"
   exit 255
@@ -16,13 +17,15 @@ if [[ -z "${AVALANCHEGO_PATH}" ]]; then
   exit 255
 fi
 
+ENABLE_WHITELIST_VTX_TESTS=${ENABLE_WHITELIST_VTX_TESTS:-false}
+
 #################################
 # download avalanche-network-runner
 # https://github.com/ava-labs/avalanche-network-runner
 # TODO: migrate to upstream avalanche-network-runner
 GOARCH=$(go env GOARCH)
 GOOS=$(go env GOOS)
-NETWORK_RUNNER_VERSION=1.0.5
+NETWORK_RUNNER_VERSION=1.0.6
 DOWNLOAD_PATH=/tmp/avalanche-network-runner.tar.gz
 DOWNLOAD_URL=https://github.com/ava-labs/avalanche-network-runner/releases/download/v${NETWORK_RUNNER_VERSION}/avalanche-network-runner_${NETWORK_RUNNER_VERSION}_linux_amd64.tar.gz
 if [[ ${GOOS} == "darwin" ]]; then
@@ -74,11 +77,12 @@ PID=${!}
 echo "running e2e tests against the local cluster with ${AVALANCHEGO_PATH}"
 ./tests/e2e/e2e.test \
 --ginkgo.v \
+--ginkgo.skip "\[Local\]" \
 --log-level debug \
 --network-runner-grpc-endpoint="0.0.0.0:12342" \
 --avalanchego-log-level=INFO \
 --avalanchego-path=${AVALANCHEGO_PATH} \
---enable-whitelist-vtx-tests=true || EXIT_CODE=$?
+--enable-whitelist-vtx-tests=${ENABLE_WHITELIST_VTX_TESTS} || EXIT_CODE=$?
 
 kill ${PID}
 

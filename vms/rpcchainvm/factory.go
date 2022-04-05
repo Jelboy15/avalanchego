@@ -5,8 +5,10 @@ package rpcchainvm
 
 import (
 	"errors"
-	"io/ioutil"
+	"fmt"
+	"io"
 	"log"
+	"path/filepath"
 
 	"google.golang.org/grpc"
 
@@ -77,30 +79,35 @@ func (f *factory) New(ctx *snow.Context) (interface{}, error) {
 			Level:  hclog.Info,
 		})
 	} else {
-		log.SetOutput(ioutil.Discard)
-		config.Stderr = ioutil.Discard
+		log.SetOutput(io.Discard)
+		config.Stderr = io.Discard
 		config.Logger = hclog.New(&hclog.LoggerOptions{
-			Output: ioutil.Discard,
+			Output: io.Discard,
 		})
 	}
 	client := plugin.NewClient(config)
 
+	pluginName := filepath.Base(f.path)
+	pluginErr := func(err error) error {
+		return fmt.Errorf("plugin: %q: %w", pluginName, err)
+	}
+
 	rpcClient, err := client.Client()
 	if err != nil {
 		client.Kill()
-		return nil, err
+		return nil, pluginErr(err)
 	}
 
 	raw, err := rpcClient.Dispense("vm")
 	if err != nil {
 		client.Kill()
-		return nil, err
+		return nil, pluginErr(err)
 	}
 
 	vm, ok := raw.(*VMClient)
 	if !ok {
 		client.Kill()
-		return nil, errWrongVM
+		return nil, pluginErr(errWrongVM)
 	}
 
 	vm.SetProcess(client)

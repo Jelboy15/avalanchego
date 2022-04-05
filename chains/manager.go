@@ -38,6 +38,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms"
 	"github.com/ava-labs/avalanchego/vms/metervm"
 	"github.com/ava-labs/avalanchego/vms/proposervm"
@@ -322,11 +323,7 @@ func (m *manager) buildChain(chainParams ChainParameters, sb Subnet) (*chain, er
 	if chainParams.ID != constants.PlatformChainID && vmID == constants.PlatformVMID {
 		return nil, errCreatePlatformVM
 	}
-
-	primaryAlias, err := m.PrimaryAlias(chainParams.ID)
-	if err != nil {
-		primaryAlias = chainParams.ID.String()
-	}
+	primaryAlias := m.PrimaryAliasOrDefault(chainParams.ID)
 
 	// Create the log and context of the chain
 	chainLog, err := m.LogFactory.MakeChain(primaryAlias)
@@ -539,6 +536,11 @@ func (m *manager) createAvalancheChain(
 	// VM uses this channel to notify engine that a block is ready to be made
 	msgChan := make(chan common.Message, defaultChannelSize)
 
+	gossipConfig := m.GossipConfig
+	if sbConfigs, ok := m.SubnetConfigs[ctx.SubnetID]; ok && ctx.SubnetID != constants.PrimaryNetworkID {
+		gossipConfig = sbConfigs.GossipConfig
+	}
+
 	// Passes messages from the consensus engine to the network
 	sender, err := sender.New(
 		ctx,
@@ -546,7 +548,7 @@ func (m *manager) createAvalancheChain(
 		m.Net,
 		m.ManagerConfig.Router,
 		m.TimeoutManager,
-		m.GossipConfig,
+		gossipConfig,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't initialize sender: %w", err)
@@ -564,6 +566,18 @@ func (m *manager) createAvalancheChain(
 	if m.MeterVMEnabled {
 		vm = metervm.NewVertexVM(vm)
 	}
+
+	// Handles serialization/deserialization of vertices and also the
+	// persistence of vertices
+	vtxManager := state.NewSerializer(
+		state.SerializerConfig{
+			ChainID:             ctx.ChainID,
+			VM:                  vm,
+			DB:                  vertexDB,
+			Log:                 ctx.Log,
+			XChainMigrationTime: version.GetXChainMigrationTime(ctx.NetworkID),
+		},
+	)
 	if err := vm.Initialize(
 		ctx.Context,
 		vmDBManager,
@@ -576,11 +590,6 @@ func (m *manager) createAvalancheChain(
 	); err != nil {
 		return nil, fmt.Errorf("error during vm's Initialize: %w", err)
 	}
-
-	// Handles serialization/deserialization of vertices and also the
-	// persistence of vertices
-	vtxManager := &state.Serializer{}
-	vtxManager.Initialize(ctx.Context, vm, vertexDB)
 
 	sampleK := consensusParams.K
 	if uint64(sampleK) > bootstrapWeight {
@@ -663,10 +672,8 @@ func (m *manager) createAvalancheChain(
 	handler.SetConsensus(engine)
 
 	// Register health check for this chain
-	chainAlias, err := m.PrimaryAlias(ctx.ChainID)
-	if err != nil {
-		chainAlias = ctx.ChainID.String()
-	}
+	chainAlias := m.PrimaryAliasOrDefault(ctx.ChainID)
+
 	// Grab the context lock before calling the chain's health check
 	check := health.CheckerFunc(func() (interface{}, error) {
 		ctx.Lock.Lock()
@@ -688,7 +695,7 @@ func (m *manager) createAvalancheChain(
 		Name:    chainAlias,
 		Engine:  engine,
 		Handler: handler,
-	}, err
+	}, nil
 }
 
 // Create a linear chain using the Snowman consensus engine
@@ -725,6 +732,11 @@ func (m *manager) createSnowmanChain(
 	// VM uses this channel to notify engine that a block is ready to be made
 	msgChan := make(chan common.Message, defaultChannelSize)
 
+	gossipConfig := m.GossipConfig
+	if sbConfigs, ok := m.SubnetConfigs[ctx.SubnetID]; ok && ctx.SubnetID != constants.PrimaryNetworkID {
+		gossipConfig = sbConfigs.GossipConfig
+	}
+
 	// Passes messages from the consensus engine to the network
 	sender, err := sender.New(
 		ctx,
@@ -732,7 +744,7 @@ func (m *manager) createSnowmanChain(
 		m.Net,
 		m.ManagerConfig.Router,
 		m.TimeoutManager,
-		m.GossipConfig,
+		gossipConfig,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't initialize sender: %w", err)
@@ -867,10 +879,7 @@ func (m *manager) createSnowmanChain(
 	handler.SetConsensus(engine)
 
 	// Register health checks
-	chainAlias, err := m.PrimaryAlias(ctx.ChainID)
-	if err != nil {
-		chainAlias = ctx.ChainID.String()
-	}
+	chainAlias := m.PrimaryAliasOrDefault(ctx.ChainID)
 
 	check := health.CheckerFunc(func() (interface{}, error) {
 		ctx.Lock.Lock()
